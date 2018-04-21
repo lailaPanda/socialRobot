@@ -125,12 +125,4 @@ def createMap(cords):
     
     
     
-    
-
-
-for raw in data:
-    print(type(raw))
-    
- for index, thisPersonInst in thisPerson.iterrows():
-     print(thisPerson['posX'])
 
