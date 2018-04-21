@@ -67,7 +67,9 @@ def getAroundData(x,y):
     [x0,y0] = [x-pixel_square_size/2,y-pixel_square_size/2]
     for i in range(0,around_mat.shape[0]):
         for j in range(0,around_mat.shape[1]):
+            #create a rectangle
             pygame.Rect((x0 + i*),(),(),())
+            
             
             
     
