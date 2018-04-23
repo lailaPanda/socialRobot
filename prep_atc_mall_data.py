@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 from pylab import *
 from sklearn.neural_network import MLPRegressor
 from sklearn import preprocessing
+from sklearn.externals import joblib
+
 #if you get SettingWithCopyWarning refer https://maxpowerwastaken.github.io/blog/pandas_view_vs_copy/
 
 
@@ -29,7 +31,7 @@ cords.columns = ['x','y']
 #number of uniqie people in the dataset
 upids = data.pid.unique()
 len(data.pid.unique())
-aroundData = getAroundPeople(upids,2)
+aroundData = getAroundPeople(upids,1)
 [mapMat,maxX,minX,maxY,minY,normCords] = createMap(cords)
 features = getFeatureVectors(aroundData,mapMat,maxX,minX,maxY,minY)
 [f,v] = [[],[]]
@@ -68,9 +70,18 @@ v_train_scaled = scaler_v.transform(v_train)
 f_test_scaled = scaler_f.transform(f_test)
 v_test_scaled = scaler_v.transform(v_test)
 
+#save scalers to file
+joblib.dump(scaler_f, 'scaler_f.pkl') 
+joblib.dump(scaler_v, 'scaler_v.pkl') 
+
+
+
 #training regressor (multiyayer NN)
 reg = MLPRegressor(hidden_layer_sizes=(100,5,5), activation='relu', solver='adam', alpha=0.0001, batch_size='auto', learning_rate='constant', learning_rate_init=0.001, power_t=0.5, max_iter=200, shuffle=True, random_state=None, tol=0.0001, verbose=False, warm_start=False, momentum=0.9, nesterovs_momentum=True, early_stopping=False, validation_fraction=0.1, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
 reg.fit(f_train_scaled,v_train_scaled)
+joblib.dump(reg, 'NNmodel.pkl') 
+
+#save model
 
 
 #predict test data
