@@ -14,6 +14,8 @@ def unwrapFeatures(feature):
     f = []
     v = []
     for i in range(0,len(feature)):
+        if ((i == 0) or (i==1)):
+            f.append(feature[i])
         if (type(feature[i]) == list):
             for j in range(0,len(feature[i])):
                 f.append(feature[i][j])
@@ -26,6 +28,10 @@ def unwrapFeatures(feature):
     return [f,v]
 
 def getAngle(sin_val,cos_val):
+    if(sin_val > 1): sin_val =1
+    if(sin_val < -1): sin_val = -1
+    if(cos_val > 1): cos_val=1
+    if(cos_val < -1): cos_val =-1
     quad = [0,0,0,0]
     if (sin_val > 0):
         quad[0] = 1
@@ -65,6 +71,17 @@ def getAngle(sin_val,cos_val):
     angle = (sangle + cangle)/2
     return angle
         
+def getAngleFromCoords(x,y):
+    if(x == 0):
+        angle = math.pi/2
+        return angle
+    angle = math.atan(abs(y/x))
+    if((x > 0) and (y > 0)): angle = angle
+    if((x < 0) and (y > 0)): angle = math.pi - angle
+    if((x < 0) and  (y < 0)): angle = math.pi + angle
+    if((x > 0) and (y < 0)): angle = math.pi*2 - angle
+    return angle
+    
         
 
         

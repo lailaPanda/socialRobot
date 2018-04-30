@@ -36,18 +36,22 @@ import matplotlib.pyplot as plt
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
+from pathfinding.finder.breadth_first import BreadthFirstFinder
+
 from operations import unwrapFeatures
 from operations import getAngle
 from sklearn.externals import joblib
 from sklearn import preprocessing
 from sklearn.neural_network import MLPRegressor
+from operations import getAngleFromCoords
+
 
 
 
 
 
 #these should ne imported from the other file. Do this later
-SQUARE_SIZE = 11000 #the size of the square the person looks around this is in mm
+SQUARE_SIZE = 5000 #the size of the square the person looks around this is in mm
 GRIDSIZE = 1000  #grids would be GRIDSIZE * GIRDSIZE . this is in mm
  
 # -- Global constants
@@ -56,50 +60,105 @@ GRIDSIZE = 1000  #grids would be GRIDSIZE * GIRDSIZE . this is in mm
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 BLUE = (50, 50, 255)
+RED = (255, 0, 0)
+YELLOW = (255, 255, 0)
  
 
 #real world dimentions of the game world in mm
-WIDTH = 20000
-HEIGHT = 20000
+WIDTH = 200000
+HEIGHT = 200000
 #scale-down to the screen
-SCALE = 20
+SCALE = 200
 # Screen dimensions
 SCREEN_WIDTH = math.floor(WIDTH/SCALE)
 SCREEN_HEIGHT = math.floor(HEIGHT/SCALE)
  
-#players
+#agents
 NUM_AGENTS=10
 AGENT_SIZE=15 #here width = height for simplicity
-
-screendata = []
-gridsize = 0
-
+MAX_VELO = 5000 # this is in mm
 
 #load model and scalers from disk
 reg = joblib.load('NNmodel.pkl') 
 scaler_f = joblib.load('scaler_f.pkl') 
 scaler_v = joblib.load('scaler_v.pkl') 
 
-f=getFearureVector(agent)
+f = [[-0.5,-0.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]
+reg.predict(f)
 
 
 #this returns the feature vector to be input to the motion prediction model
 def getFearureVector(agent):
-    [obs_mat,people_mat,people_velo,people_angle] = getAroundData(agent.rect.x,agent.rect.y)
+    [around_mat,people_velo_x,people_velo_y] = getAroundData(agent.rect.x,agent.rect.y)
     #get relative postion of the next goal of this agent
-    goal = list(np.array([agent.rect.x,agent.rect.y]) - np.array(agent.path[agent.goalPos]))
-    feature = [goal,obs_mat,people_mat,people_velo,people_angle,-1,-1] 
+    goal_pos = list(np.array(agent.path[agent.goalPos]) - np.array([agent.rect.x,agent.rect.y]))
+    #normalize goal pos vector
+    goal_sum = abs(goal_pos[0]) + abs(goal_pos[1])
+    goal_pos[0] /= goal_sum
+    goal_pos[1] /= goal_sum
+    print("agent position = " + str([agent.rect.x,agent.rect.y]))
+    print("goal position = " + str(agent.path[agent.goalPos]))
+    print("goal_pos = " + str(goal_pos))
+    feature = [goal_pos[0],goal_pos[1],around_mat,people_velo_x,people_velo_y,-1,-1] 
     [f,v] = unwrapFeatures(feature)
     return f
         
-def predict(NNmodel,f):
+def predict(f):
     df = pd.DataFrame(data = [f])
-    df_scaled = scaler_f.transform(df)
-    pred = np.asmatrix(reg.predict(df_scaled))
+    pred = reg.predict(df)[0]
+    #simple rescaling pred
+    pred_sum = abs(pred[0]) + abs(pred[1])
+    pred[0] /= pred_sum
+    pred[1] /= pred_sum
+    
+    '''
+    #pred = scaler_v.inverse_transform(pred)
     velo = pred[0,0]
+    sin = pred[0,1]
+    cos = pred[0,2]
+    #scale back velo to fit screen. The predicted velo is in mm/s
+    #velo = velo/(SCALE)
+    
+    if(pred[0,1] > 1): pred[0,1] = 1
+    if(pred[0,1] < -1): pred[0,1] = -1
+    if(pred[0,2] > 1): pred[0,2] = 1
+    if(pred[0,2] < -1): pred[0,2] = -1
     angle = getAngle(pred[0,1],pred[0,2])
-    #rescale!!!!!
+    '''
+    return pred
 
+def nextVelo_allAgents():
+    #iterate through all agents
+    for i in range(0,len(all_sprite_list.sprites())):
+        if(type(all_sprite_list.sprites()[i]) is Agent):
+            f = getFearureVector(all_sprite_list.sprites()[i])
+            pred = predict(f)
+            print("pred = " + str(pred))
+            '''
+            if(f[0]*sin < 0): sin = (sin + f[0])/2
+            if(f[1]*cos < 0): cos = (cos + f[1])/2
+            if(velo < 0): velo = 0
+            if(velo > 1): velo=1
+            velo*=100
+            '''
+            all_sprite_list.sprites()[i].setSpeed(pred[0]*8,pred[1]*8)
+            '''
+            print("sin, cos = " + str([sin,cos]))
+            print("abs velo : " + str(velo))
+            print("velocity : " + str(velo*cos) + " " + str(velo*sin))
+            print("angle : " + str(getAngle(sin,cos)*180/math.pi))
+            '''
+            
+            
+
+#for testing
+def printAgentData():
+    for i in range(0,len(all_sprite_list.sprites())):
+        agent = all_sprite_list.sprites()[i]
+        if(type(agent) is Agent):
+            print("agent" + str(i))
+            print([agent.rect.x,agent.rect.y,agent.goalPos,agent.path,agent.speed_x,agent.speed_y])
+            print("dist to tmp goal = " + str(abs(agent.rect.x - agent.path[agent.goalPos][0]) + abs(agent.rect.y - agent.path[agent.goalPos][1])))
     
     
 #get around data of position [x,y]
@@ -109,8 +168,8 @@ def getAroundData(x,y):
         pixel_grid_size = GRIDSIZE/SCALE
         obs_mat = np.zeros((int(pixel_square_size/pixel_grid_size),int(pixel_square_size/pixel_grid_size)))
         people_mat = np.zeros((int(pixel_square_size/pixel_grid_size),int(pixel_square_size/pixel_grid_size)))
-        people_velo =  np.zeros((int(pixel_square_size/pixel_grid_size),int(pixel_square_size/pixel_grid_size)))
-        people_angle =  np.zeros((int(pixel_square_size/pixel_grid_size),int(pixel_square_size/pixel_grid_size)))
+        people_velo_x =  np.zeros((int(pixel_square_size/pixel_grid_size),int(pixel_square_size/pixel_grid_size)))
+        people_velo_y =  np.zeros((int(pixel_square_size/pixel_grid_size),int(pixel_square_size/pixel_grid_size)))
     
         #this is the left,top coordinate of the look around square (coordinates in pygame start from left,top corner)
         [x0,y0] = [x-pixel_square_size/2,y-pixel_square_size/2]
@@ -132,18 +191,18 @@ def getAroundData(x,y):
                     obs_mat[i][j] = 1
                 if(maxPlayerOvelap > 0.5):
                     people_mat[i][j]=1
-                    people_velo[i][j] = math.sqrt(plyr[0].speed_x*plyr[0].speed_x + plyr[0].speed_y*plyr[0].speed_y)
-                    people_angle[i][j] = math.atan2(plyr[0].speed_y,plyr[0].speed_x)
-                    
-        return [obs_mat,people_mat,people_velo,people_angle]
+                    people_velo_x[i][j] = math.sqrt(plyr[0].speed_x)
+                    people_velo_y[i][j] = math.sqrt(plyr[0].speed_y)
+                
+        around_mat =  (np.logical_or(people_mat,obs_mat)).astype(int)            
+        return [around_mat,people_velo_x,people_velo_y]
 
 def getMap():
-    gridsize = 50
-    screendata = np.ones((int(SCREEN_HEIGHT/gridsize),int(SCREEN_WIDTH/gridsize)))
+    screendata = np.ones((int(SCREEN_HEIGHT/mapgridsize),int(SCREEN_WIDTH/mapgridsize)))
     
     for i in range(0,screendata.shape[0]):#y coordinate
         for j in range(0,screendata.shape[1]):#x coordinates
-            gridRect = pygame.Rect((j*gridsize),(i*gridsize),(gridsize),(gridsize))
+            gridRect = pygame.Rect((j*mapgridsize),(i*mapgridsize),(mapgridsize),(mapgridsize))
             [obs,plyr] = getMaxOvelappingThings(gridRect)
             maxObsOverlap = 0
             if(obs.shape[0] > 0):
@@ -153,17 +212,19 @@ def getMap():
                 plyr = plyr.iloc[0]
             if(maxObsOverlap > 0.2):
                 screendata[i][j] = 0
-    return [screendata,gridsize] 
+    return screendata
     
 def getPath(init_x,init_y,goal_x,goal_y):
     grid = Grid(matrix = screendata)
-    start = grid.node(int(init_x/gridsize),int(init_y/gridsize))
-    end = grid.node(int(goal_x/gridsize),int(goal_y/gridsize))
+    start = grid.node(int(init_x/mapgridsize),int(init_y/mapgridsize))
+    end = grid.node(int(goal_x/mapgridsize),int(goal_y/mapgridsize))
     finder = AStarFinder(diagonal_movement=DiagonalMovement.always)
+    finder = BreadthFirstFinder(diagonal_movement=DiagonalMovement.always)
+        
     path, runs = finder.find_path(start, end, grid)
     #print('operations:', runs, 'path length:', len(path))
-    #print(grid.grid_str(path=path, start=start, end=end))
-    path = np.array(path)*gridsize
+    print(grid.grid_str(path=path, start=start, end=end))
+    path = np.array(path)*mapgridsize
     path[0] = [init_x,init_y]
     path[len(path)-1] = [goal_x,goal_y]
     #remove points in obstacles
@@ -238,17 +299,32 @@ def getOverlapLineSeg(p1,p2): # p1 = [x1,x2], p2 = [x3,x4]
             overlap = p1[1] -p1[0]
     return overlap
     
-
-class Agent(pygame.sprite.Sprite):
- 
+class Point(pygame.sprite.Sprite):
     # Constructor function
-    def __init__(self,rect):
+    def __init__(self,rect,col):
         # Call the parent's constructor
         super().__init__()
         [x,y] = [rect.left,rect.top]
         # Set height, width
         self.image = pygame.Surface([rect.width, rect.width])
-        self.image.fill(WHITE)
+        self.image.fill(col)
+ 
+        # Make our top-left corner the passed-in location.
+        self.rect = self.image.get_rect()
+        self.rect.y = y
+        self.rect.x = x
+ 
+        
+class Agent(pygame.sprite.Sprite):
+ 
+    # Constructor function
+    def __init__(self,rect,COL):
+        # Call the parent's constructor
+        super().__init__()
+        [x,y] = [rect.left,rect.top]
+        # Set height, width
+        self.image = pygame.Surface([rect.width, rect.width])
+        self.image.fill(COL)
  
         # Make our top-left corner the passed-in location.
         self.rect = self.image.get_rect()
@@ -261,6 +337,8 @@ class Agent(pygame.sprite.Sprite):
         self.walls = None
         self.path = []
         self.goalPos = 0
+        self.goalPoints = []
+        self.reached_goal = False
  
     def setSpeed(self, x, y):
         self.speed_x = x
@@ -269,9 +347,33 @@ class Agent(pygame.sprite.Sprite):
     def setPath(self,path):
         self.path = path
     def update(self):
+        print("in update")
+        #update current goal possition
+        dist_to_goal = (abs(self.rect.x - self.path[self.goalPos][0]) + abs(self.rect.y - self.path[self.goalPos][1]))
+        if(dist_to_goal < 20):
+            self.goalPos+=1
+            if(self.goalPos >= len(self.path)):
+                self.goalPos = (len(self.path) - 1)
+                self.reached_goal = True
+                self.speed_x = 0
+                self.speed_y = 0
+                print("here!")
+        #color current goal
+        for i in range(0,len(all_sprite_list.sprites())):
+            if(type(all_sprite_list.sprites()[i]) is Point):
+                point = all_sprite_list.sprites()[i]
+                dist = abs(self.path[self.goalPos][0] - point.rect.x) + abs(self.path[self.goalPos][1] - point.rect.y)
+                if (dist < 1):
+                    all_sprite_list.sprites()[i].image.fill((0,0,0))
+                else:
+                    all_sprite_list.sprites()[i].image.fill((0,0,0))
+                    
+                #print("dist to goal : " + str(dist))
+                #print("goal pos = " + str(self.goalPos))
+            
         """ Update the player position. """
         # Move left/right
-        self.rect.x += self.speed_x
+        self.rect.x += int(self.speed_x)#times step
  
         # Did this update cause us to hit a wall?
         block_hit_list = pygame.sprite.spritecollide(self, self.walls, False)
@@ -285,7 +387,7 @@ class Agent(pygame.sprite.Sprite):
                 self.rect.left = block.rect.right
  
         # Move up/down
-        self.rect.y += self.speed_y
+        self.rect.y += int(self.speed_y) #timestep
  
         # Check and see if we hit anything
         block_hit_list = pygame.sprite.spritecollide(self, self.walls, False)
@@ -358,6 +460,7 @@ def isOccupied(rect):
 def initAgent():
      itr = 0
      found = True
+     col = (0,0,0)
      #generate random rectangle for initial position of the agent
      initRect = pygame.Rect(random.randint(0,SCREEN_WIDTH),random.randint(0,SCREEN_HEIGHT),AGENT_SIZE,AGENT_SIZE)
      agent = -1
@@ -381,24 +484,33 @@ def initAgent():
      if (len(path) == 0):
          found=False
      if(found):
-         agent = Agent(initRect)
+         col = ((random.randint(30, 255)),(random.randint(30, 255)),(random.randint(30, 255)))
+         agent = Agent(initRect,col)
          agent.walls = wall_list
          #initial speed of this agent
          agent.setSpeed(0,0)
          agent.path = path
-     return agent
+         #sometimes the goal is not in the path! due to scaling and obstacle avoidance. so add it manually
+         goalRect = pygame.Rect((path[len(path)-1][0]),(path[len(path)-1][1]),(AGENT_SIZE/4),(AGENT_SIZE/4))
+     return [agent,goalRect,col]
          
-    
+  
 
-def createPlayers():
-    agent_rects = []
+def createPlayers(plotGoals,plotPaths):
     for i in range(0,NUM_AGENTS):
-        agent = initAgent()
+        [agent,goalRect,col] = initAgent()
         if (type(agent) is Agent):
+            print("adding agent")
             all_sprite_list.add(agent)
-    return agent_rects
+            if(plotGoals):
+                all_sprite_list.add(Point(goalRect,col)
+            if(plotPaths):
+                for j in range(0,len(agent.path)):
+                    rect = pygame.Rect(agent.path[j][0],agent.path[j][1],5,5)
+                    all_sprite_list.add(Point(rect,col))
     
-            
+    
+          
 # Call this function so the Pygame library can initialize itself
 pygame.init()    
 # Create an 800x600 sized screen
@@ -428,8 +540,9 @@ for i in range(0,len(wallList)):
 #player = Player(player_rects[0])
 #player.walls = wall_list
 #all_sprite_list.add(player)
-[screendata,gridsize]  = getMap() 
-createPlayers()
+mapgridsize = 30
+screendata = getMap() 
+createPlayers(True,True)
  
 clock = pygame.time.Clock()
  
@@ -437,20 +550,24 @@ done = False
 
 
 while not done:
-    
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            done = True
     #predict velocities and headings from the NN
     #update them
     #yey!
- 
+    print("runnning..")
     all_sprite_list.update()
+    nextVelo_allAgents()
  
     screen.fill(BLACK)
  
     all_sprite_list.draw(screen)
  
     pygame.display.flip()
+    #printAgentData()
  
-    clock.tick(60)
+    clock.tick(10)
  
 pygame.quit()
 

@@ -1,0 +1,19 @@
+velo_pred
+cor = 0.840436507637908
+error mean = 0.026370
+
+angle_pred
+cor = 0.8317337672518719
+error mean =  0.267710 rad
+        = 14.89 degrees
+
+
+velo_x prediction
+cor = 0.9560675261160371
+error mean = 0.094497
+values are scaled to [-1,1]
+
+velo_y prediction
+cor = 0.9256854304209998
+error mean = 0.108474
+values are scaled to [-1,1]0.95
