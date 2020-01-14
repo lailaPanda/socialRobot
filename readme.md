@@ -9,3 +9,7 @@ broad methods with other primitive shortest path-planning algorithms such as A* 
 to find a collision-free shortest path for the robotic agent through a crowded environment.
 To  analyze  the  said  techniques  we  use  certain  existing  simulation  environments  and
 present a comparison between the approaches.
+
+For more detail see 
+https://sleekeagle.github.io/2019/12/20/social_navigation_of_a_mobile_robot.html
+
