@@ -1,3 +1,5 @@
+# Social Navigation of a Mobile Robot
+
 The goal of this work is to implement and analyze different methods that enable robots
 to navigate through crowded environments, such as those that may be encountered in
 shopping malls, road side walks, or industries.  The two key methods considered here for
